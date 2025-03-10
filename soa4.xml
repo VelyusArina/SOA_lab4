@@ -1,0 +1,174 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+      xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+      xmlns:http="http://www.mulesoft.org/schema/mule/http"
+      xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
+      xmlns="http://www.mulesoft.org/schema/mule/core"
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+        http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+        http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+        http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+        http://www.mulesoft.org/schema/mule/ee/core http://www.mulesoft.org/schema/mule/ee/core/current/mule-ee.xsd">
+
+    <!-- Конфигурация для REST API -->
+    <http:listener-config name="REST_Listener_Config">
+        <http:listener-connection host="0.0.0.0" port="19765" protocol="HTTPS">
+            <tls:context>
+                <tls:key-store path="server.keystore" alias="localhost" keyPassword="secret" password="secret"/>
+            </tls:context>
+        </http:listener-connection>
+    </http:listener-config>
+
+    <!-- Конфигурация для исходящих SOAP-запросов -->
+    <http:request-config name="SOAP_Request_Config">
+        <http:request-connection host="localhost" port="19766" protocol="HTTPS">
+            <tls:context>
+                <tls:trust-store insecure="true"/>
+                <tls:key-store path="server.keystore" alias="localhost" keyPassword="secret" password="secret"/>
+            </tls:context>
+        </http:request-connection>
+    </http:request-config>
+
+    <!-- REST Endpoint: Уменьшение сложности -->
+    <flow name="decrease-difficulty-flow">
+        <http:listener config-ref="REST_Listener_Config" 
+                      path="/bars/labwork/{labwork_id}/difficulty/decrease/{steps_count}" 
+                      allowedMethods="POST">
+			<http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*",
+	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+	"Access-Control-Allow-Headers" : "*",
+	"Access-Control-Allow-Credentials" : "true"
+}]]]></http:headers>
+			</http:response>
+		</http:listener>
+        
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/xml
+ns soapenv http://schemas.xmlsoap.org/soap/envelope/
+ns ex http://example.com/soap
+---
+soapenv#Envelope: {
+    soapenv#Header: {},
+    soapenv#Body: {
+        decreaseDifficultyRequest: {
+            labworkId: attributes.uriParams.labwork_id,
+            stepsCount: attributes.uriParams.steps_count
+        }
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <http:request config-ref="SOAP_Request_Config" 
+                      method="POST" 
+                      path="/ws">
+            <http:headers><![CDATA[#[{
+                "SOAPAction": "http://example.com/soap/decreaseDifficulty",
+                "Content-Type": "text/xml"
+            }]]]></http:headers>
+        </http:request>
+
+        <!-- Обработка SOAP-ответа -->
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+ns soapenv http://schemas.xmlsoap.org/soap/envelope/
+ns ex http://example.com/soap
+---
+{
+    status: payload.soapenv#Envelope.soapenv#Body.statusResponse.status,
+    message: payload.soapenv#Envelope.soapenv#Body.statusResponse.message
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+
+    <!-- REST Endpoint: Удаление работы -->
+    <flow name="delete-labwork-flow">
+        <http:listener config-ref="REST_Listener_Config" 
+                      path="/bars/discipline/{discipline_id}/labwork/{labwork_id}/remove" 
+                      allowedMethods="POST">
+        <http:response >
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*",
+	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+	"Access-Control-Allow-Headers" : "*",
+	"Access-Control-Allow-Credentials" : "true"
+}]]]></http:headers>
+			</http:response>
+			</http:listener>
+        
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/xml
+ns soapenv http://schemas.xmlsoap.org/soap/envelope/
+ns ex http://example.com/soap
+---
+soapenv#Envelope: {
+    soapenv#Header: {},
+    soapenv#Body: {
+        deleteLabworkRequest: {
+            disciplineId: attributes.uriParams.discipline_id,
+            labworkId: attributes.uriParams.labwork_id
+        }
+    }
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+
+        <http:request config-ref="SOAP_Request_Config" 
+                      method="POST" 
+                      path="/ws">
+            <http:headers><![CDATA[#[{
+                "SOAPAction": "http://example.com/soap/deleteLabwork",
+                "Content-Type": "text/xml"
+            }]]]></http:headers>
+        </http:request>
+
+        <!-- Обработка SOAP-ответа -->
+        <ee:transform>
+            <ee:message>
+                <ee:set-payload><![CDATA[%dw 2.0
+output application/json
+ns soapenv http://schemas.xmlsoap.org/soap/envelope/
+ns ex http://example.com/soap
+---
+{
+    status: payload.soapenv#Envelope.soapenv#Body.statusResponse.status,
+    message: payload.soapenv#Envelope.soapenv#Body.statusResponse.message
+}]]></ee:set-payload>
+            </ee:message>
+        </ee:transform>
+    </flow>
+    
+    <!-- ОБРАБОТЧИК OPTIONS -->
+    <flow name="cors-options-handler">
+        <http:listener config-ref="REST_Listener_Config" 
+                      path="/*" 
+                      allowedMethods="OPTIONS">
+        	<http:response statusCode="200">
+				<http:headers ><![CDATA[#[output application/java
+---
+{
+	"Access-Control-Allow-Origin" : "*",
+	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+	"Access-Control-Allow-Headers" : "*",
+	"Access-Control-Allow-Credentials" : "true"
+}]]]></http:headers>
+			</http:response>
+			</http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="d880bab9-7422-41b4-a675-cdc89f65f761" message='#["OPTIONS"]'/>
+        
+    
+</flow>
+</mule>

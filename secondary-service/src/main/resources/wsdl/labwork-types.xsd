@@ -1,0 +1,82 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema"
+           targetNamespace="http://example.com/labwork"
+           xmlns:tns="http://example.com/labwork">
+
+    <!-- Coordinates -->
+    <xs:complexType name="Coordinates">
+        <xs:sequence>
+            <xs:element name="x" type="xs:double"/>
+            <xs:element name="y" type="xs:long"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- DisciplineType -->
+    <xs:complexType name="Discipline">
+        <xs:sequence>
+            <xs:element name="id" type="xs:int"/>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="labsCount" type="xs:int"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- DifficultyType Enum -->
+    <xs:simpleType name="Difficulty">
+        <xs:restriction base="xs:string">
+            <xs:enumeration value="NORMAL"/>
+            <xs:enumeration value="HARD"/>
+            <xs:enumeration value="VERY_HARD"/>
+            <xs:enumeration value="IMPOSSIBLE"/>
+            <xs:enumeration value="TERRIBLE"/>
+        </xs:restriction>
+    </xs:simpleType>
+
+    <!-- LabWork -->
+    <xs:complexType name="LabWork">
+        <xs:sequence>
+            <xs:element name="id" type="xs:int"/>
+            <xs:element name="name" type="xs:string"/>
+            <xs:element name="coordinates" type="tns:Coordinates"/>
+            <xs:element name="creationDate" type="xs:dateTime"/>
+            <xs:element name="minimalPoint" type="xs:double"/>
+            <xs:element name="description" type="xs:string" minOccurs="0"/>
+            <xs:element name="tunedInWorks" type="xs:long" minOccurs="0"/>
+            <xs:element name="difficulty" type="tns:Difficulty"/>
+            <xs:element name="discipline" type="tns:Discipline"/>
+        </xs:sequence>
+    </xs:complexType>
+
+    <!-- Запросы/ответы -->
+    <xs:element name="DecreaseDifficultyRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="labworkId" type="xs:int"/>
+                <xs:element name="stepsCount" type="xs:int"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="DecreaseDifficultyResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="labwork" type="tns:LabWork"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="DeleteLabworkRequest">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="labworkId" type="xs:int"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+
+    <xs:element name="DeleteLabworkResponse">
+        <xs:complexType>
+            <xs:sequence>
+                <xs:element name="success" type="xs:boolean"/>
+            </xs:sequence>
+        </xs:complexType>
+    </xs:element>
+</xs:schema>
