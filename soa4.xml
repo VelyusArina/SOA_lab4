@@ -4,7 +4,8 @@
       xmlns:http="http://www.mulesoft.org/schema/mule/http"
       xmlns:ee="http://www.mulesoft.org/schema/mule/ee/core"
       xmlns="http://www.mulesoft.org/schema/mule/core"
-      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+      xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+      xsi:schemaLocation="
         http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
         http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
         http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
@@ -24,7 +25,6 @@
         <http:request-connection host="localhost" port="19766" protocol="HTTPS">
             <tls:context>
                 <tls:trust-store insecure="true"/>
-                <tls:key-store path="server.keystore" alias="localhost" keyPassword="secret" password="secret"/>
             </tls:context>
         </http:request-connection>
     </http:request-config>
@@ -34,18 +34,18 @@
         <http:listener config-ref="REST_Listener_Config" 
                       path="/bars/labwork/{labwork_id}/difficulty/decrease/{steps_count}" 
                       allowedMethods="POST">
-			<http:response >
-				<http:headers ><![CDATA[#[output application/java
----
-{
-	"Access-Control-Allow-Origin" : "*",
-	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
-	"Access-Control-Allow-Headers" : "*",
-	"Access-Control-Allow-Credentials" : "true"
-}]]]></http:headers>
-			</http:response>
-		</http:listener>
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[{
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Content-Type": vars.contentType default "application/xml"
+                }]]]></http:headers>
+            </http:response>
+        </http:listener>
         
+        <!-- Формирование SOAP-запроса -->
         <ee:transform>
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
@@ -65,6 +65,7 @@ soapenv#Envelope: {
             </ee:message>
         </ee:transform>
 
+        <!-- Вызов SOAP-сервиса -->
         <http:request config-ref="SOAP_Request_Config" 
                       method="POST" 
                       path="/ws">
@@ -75,19 +76,39 @@ soapenv#Envelope: {
         </http:request>
 
         <!-- Обработка SOAP-ответа -->
-        <ee:transform>
-            <ee:message>
-                <ee:set-payload><![CDATA[%dw 2.0
-output application/json
+        <choice>
+            <when expression="#[%dw 2.0&#10;ns soapenv http://schemas.xmlsoap.org/soap/envelope/&#10;---&#10;payload.soapenv#Envelope.soapenv#Body.statusResponse.status == 'OK']">
+                <!-- Установка статуса и типа контента -->
+                <set-variable value="200" doc:name="Set HTTP Status" variableName="httpStatus"/>
+                <set-variable value="application/xml" doc:name="Set Content Type" variableName="contentType"/>
+                
+                <!-- Извлечение labWork -->
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output application/xml
 ns soapenv http://schemas.xmlsoap.org/soap/envelope/
-ns ex http://example.com/soap
 ---
-{
-    status: payload.soapenv#Envelope.soapenv#Body.statusResponse.status,
-    message: payload.soapenv#Envelope.soapenv#Body.statusResponse.message
-}]]></ee:set-payload>
-            </ee:message>
-        </ee:transform>
+LabWork: payload.soapenv#Envelope.soapenv#Body.statusResponse.labWork]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </when>
+            <otherwise>
+                <!-- Обработка ошибки -->
+                <set-variable value="400" doc:name="Set HTTP Status" variableName="httpStatus"/>
+                <set-variable value="text/plain" doc:name="Set Content Type" variableName="contentType"/>
+                
+                <ee:transform>
+                    <ee:message>
+                        <ee:set-payload><![CDATA[%dw 2.0
+output text/plain
+ns soapenv http://schemas.xmlsoap.org/soap/envelope/
+---
+payload.soapenv#Envelope.soapenv#Body.statusResponse.message]]></ee:set-payload>
+                    </ee:message>
+                </ee:transform>
+            </otherwise>
+        </choice>
     </flow>
 
     <!-- REST Endpoint: Удаление работы -->
@@ -95,18 +116,18 @@ ns ex http://example.com/soap
         <http:listener config-ref="REST_Listener_Config" 
                       path="/bars/discipline/{discipline_id}/labwork/{labwork_id}/remove" 
                       allowedMethods="POST">
-        <http:response >
-				<http:headers ><![CDATA[#[output application/java
----
-{
-	"Access-Control-Allow-Origin" : "*",
-	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
-	"Access-Control-Allow-Headers" : "*",
-	"Access-Control-Allow-Credentials" : "true"
-}]]]></http:headers>
-			</http:response>
-			</http:listener>
+            <http:response statusCode="#[vars.httpStatus default 200]">
+                <http:headers><![CDATA[#[{
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true",
+                    "Content-Type": "application/json"
+                }]]]></http:headers>
+            </http:response>
+        </http:listener>
         
+        <!-- Формирование SOAP-запроса -->
         <ee:transform>
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
@@ -126,6 +147,7 @@ soapenv#Envelope: {
             </ee:message>
         </ee:transform>
 
+        <!-- Вызов SOAP-сервиса -->
         <http:request config-ref="SOAP_Request_Config" 
                       method="POST" 
                       path="/ws">
@@ -135,13 +157,12 @@ soapenv#Envelope: {
             }]]]></http:headers>
         </http:request>
 
-        <!-- Обработка SOAP-ответа -->
+        <!-- Обработка ответа -->
         <ee:transform>
             <ee:message>
                 <ee:set-payload><![CDATA[%dw 2.0
 output application/json
 ns soapenv http://schemas.xmlsoap.org/soap/envelope/
-ns ex http://example.com/soap
 ---
 {
     status: payload.soapenv#Envelope.soapenv#Body.statusResponse.status,
@@ -156,19 +177,16 @@ ns ex http://example.com/soap
         <http:listener config-ref="REST_Listener_Config" 
                       path="/*" 
                       allowedMethods="OPTIONS">
-        	<http:response statusCode="200">
-				<http:headers ><![CDATA[#[output application/java
----
-{
-	"Access-Control-Allow-Origin" : "*",
-	"Access-Control-Allow-Methods" : "GET, PUT, POST, DELETE, HEAD, OPTIONS",
-	"Access-Control-Allow-Headers" : "*",
-	"Access-Control-Allow-Credentials" : "true"
-}]]]></http:headers>
-			</http:response>
-			</http:listener>
-		<logger level="INFO" doc:name="Logger" doc:id="d880bab9-7422-41b4-a675-cdc89f65f761" message='#["OPTIONS"]'/>
-        
+            <http:response statusCode="204">
+                <http:headers><![CDATA[#[{
+                    "Access-Control-Allow-Origin": "*",
+                    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, HEAD, OPTIONS",
+                    "Access-Control-Allow-Headers": "*",
+                    "Access-Control-Allow-Credentials": "true"
+                }]]]></http:headers>
+            </http:response>
+        </http:listener>
+		<logger level="INFO" doc:name="Logger" doc:id="990d9546-c169-4ea0-8b7e-80cda7c46a60" message='#["options"]'/>
     
 </flow>
 </mule>
